@@ -19,7 +19,7 @@ def get_ipaddress(request, default=None):
             continue
         ipaddr_str = ipaddr_str.strip('\r\t\n ,')
         if ',' in ipaddr_str:
-            ipaddrs = filter(lambda x: is_ipaddress(x), map(lambda x: x.strip(), ipaddr_str.split(',')))
+            ipaddrs = list(filter(lambda x: is_ipaddress(x), map(lambda x: x.strip(), ipaddr_str.split(','))))
             if len(ipaddrs) > 0:
                 return ipaddrs[0]
             continue

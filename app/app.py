@@ -73,7 +73,7 @@ def get_info_txt_short():
     for k,func in _INFO_CALLAPI_MAP.items():
         value = str(func(request, 'N/A'))
         buffer.append(f"{_INFO_ALIAS[k].ljust(max_alias_len, '.')}.: {value}")
-    return '\n'.join(buffer)
+    return '\n'.join(buffer) + '\n'
 
 def get_info_txt():
     o = urlparse(request.base_url)
