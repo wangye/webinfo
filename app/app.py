@@ -1,7 +1,8 @@
+import logging
 import datetime, json
 from urllib.parse import urlparse
 from flask import Flask, Response
-from flask import request, abort, render_template_string
+from flask import request, redirect, abort, render_template_string
 from xml.dom.minidom import parseString
 from dicttoxml import dicttoxml
 from flask.wrappers import Request
@@ -12,12 +13,34 @@ Request.user_agent_class = ParsedUserAgent
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
+app.url_map.strict_slashes = False
+
+# https://stackoverflow.com/questions/40365390/trailing-slash-in-flask-route
+@app.before_request
+def clear_trailing():
+    rp = request.path 
+    if rp != '/' and rp.endswith('/'):
+        return redirect(rp[:-1])
+
+logger = logging.getLogger("app.py")
+
+@app.errorhandler(404)
+def page_not_found(e):
+    # Even though Flask logs it by default, 
+    # I prefer to have a logger dedicated to 404
+    logger.warning('404: {0}'.format(request.url))
+    return 'Not found', 404
 
 _INFO_CALLAPI_MAP = {
     "ip": get_ipaddress,
+    "cn": lambda request, default : get_geoinfo(request, "country", "name", default),
+    "cc": lambda request, default : get_geoinfo(request, "country", "code", default),
+    "c3": lambda request, default : get_geoinfo(request, "country", "code3", default),
+    "ct": lambda request, default : get_geoinfo(request, "city", "name", default),
     "ua": get_useragent,
     "hn": get_hostname,
     "ts": lambda request, default : get_timestamp(),
+    "dt": lambda requset, default : datetime.datetime.utcnow().strftime("%c"),
     "pt": get_remote_port,
     "os": lambda request, default : get_useragent_attr(request, 'platform', default),
     "bw": lambda request, default : get_useragent_attr(request, 'browser', default),
@@ -26,9 +49,14 @@ _INFO_CALLAPI_MAP = {
 
 _INFO_ALIAS = {
     "ip": "IP Address",
+    "cn": "Country Name",
+    "cc": "Country Code",
+    "c3": "Country Code 3",
+    "ct": "City Name",
     "ua": "User Agent",
     "hn": "Host Name",
-    "ts": "Current Timestamp",
+    "ts": "Current Timestamp (UTC)",
+    "dt": "Current Date Time (UTC)",
     "pt": "Remote Port",
     "os": "Platform Name",
     "bw": "Browser Name",
@@ -48,6 +76,10 @@ _FULL_TEMPLATE = r"""# (C) {{year}} Wangye.Org. All rights reserved.
 #   curl {{hostname}}/info.json  # Full information (JSON format)
 #   curl {{hostname}}/info.xml   # Full information (XML format)
 #   curl {{hostname}}/info/ip    # IP address only
+#   curl {{hostname}}/info/cn    # Country name only
+#   curl {{hostname}}/info/cc    # Country code only
+#   curl {{hostname}}/info/c3    # Country code 3 only
+#   curl {{hostname}}/info/ct    # City name only
 #   curl {{hostname}}/info/pt    # Remote port number only
 #   curl {{hostname}}/info/hn    # Host name only
 #   curl {{hostname}}/info/ua    # User-Agent only
@@ -55,6 +87,7 @@ _FULL_TEMPLATE = r"""# (C) {{year}} Wangye.Org. All rights reserved.
 #   curl {{hostname}}/info/bw    # Browser name only
 #   curl {{hostname}}/info/bv    # Browser version only
 #   curl {{hostname}}/info/ts    # Current UTC Timestamp
+#   curl {{hostname}}/info/dt    # Current UTC Date & Time
 
 {{info}}
 

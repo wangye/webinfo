@@ -1,5 +1,5 @@
 import datetime
-import socket
+import socket, json
 from .validators import is_useragent, is_ipaddress, is_hostname
 
 _IP_SEARCH_PARAMS = (
@@ -81,3 +81,56 @@ def is_cli_request(request):
         return False
 
     return any(map(lambda x: x in useragent, ('curl/', 'libcurl/', 'wget/',)))
+
+def get_geoinfo_summary(request, default=None):
+    geoinfo = request.headers.get('X-Geo-IP')
+    if not geoinfo or not isinstance(geoinfo, str) \
+        or not geoinfo.startswith("{") \
+            or not geoinfo.endswith("}"):
+        return default
+
+    try:
+        geo = json.loads(geoinfo)
+        buffer = []
+        if 'country' in geo.keys():
+            country = geo['country']
+            s = []
+            if 'name' in country.keys() and country['name']:
+                s.append(f"name: {country['name']}, ")
+            if 'code' in country.keys() and country['code']:
+                s.append(f"code: {country['code']}, ")
+            if 'code3' in country.keys() and country['code3']:
+                s.append(f"code3: {country['code3']}")
+            if len(s) > 0:
+                buffer.append("[Country] " + ''.join(s).strip(', '))
+
+        if 'city' in geo.keys():
+            city = geo['city']
+            s = []
+            if 'name' in city.keys() and city['name']:
+                s.append(f"name: {city['name']}")
+            if len(s) > 0:
+                buffer.append("[City] " + ''.join(s).strip(', '))
+
+        return '; '.join(buffer) if len(buffer) > 0 else default
+
+    except:
+        return default
+
+def get_geoinfo(request, section, key, default=None):
+    geoinfo = request.headers.get('X-Geo-IP')
+    if not geoinfo or not isinstance(geoinfo, str) \
+        or not geoinfo.startswith("{") \
+            or not geoinfo.endswith("}"):
+        return default
+
+    try:
+        geo = json.loads(geoinfo)
+        sect = geo[section]
+        if key in sect.keys() and sect[key]:
+            return sect[key]
+    except:
+        pass
+
+    return default
+    
