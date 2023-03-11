@@ -1,12 +1,15 @@
 import datetime
 import socket, json
+from ipaddress import ip_address
 from .validators import is_useragent, is_ipaddress, is_hostname
 
 _IP_SEARCH_PARAMS = (
     'HTTP_CLIENT_IP',
+    'HTTP_CF_CONNECTING_IP',
     'HTTP_X_FORWARDED_FOR',
     'HTTP_X_FORWARDED',
     'HTTP_X_CLUSTER_CLIENT_IP',
+    'HTTP_X_REAL_IP',
     'HTTP_FORWARDED_FOR',
     'HTTP_FORWARDED',
     'REMOTE_ADDR'
@@ -20,11 +23,12 @@ def get_ipaddress(request, default=None):
         ipaddr_str = ipaddr_str.strip('\r\t\n ,')
         if ',' in ipaddr_str:
             ipaddrs = list(filter(lambda x: is_ipaddress(x), map(lambda x: x.strip(), ipaddr_str.split(','))))
-            if len(ipaddrs) > 0:
-                return ipaddrs[0]
+            for addr_str in ipaddrs:
+                if is_ipaddress(addr_str) and not ip_address(addr_str).is_private:
+                    return addr_str
             continue
         else:
-            if is_ipaddress(ipaddr_str):
+            if is_ipaddress(ipaddr_str) and not ip_address(ipaddr_str).is_private:
                 return ipaddr_str
 
     return default if not request.remote_addr else request.remote_addr
